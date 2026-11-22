@@ -1,0 +1,30 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# React / Vite / pnpm
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Go
+bin/
+*.exe
+*.test
+*.out
+coverage.out
+
+# Logs
+*.log
+
+# Video storage
+uploads/
+processed/
+exports/
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
