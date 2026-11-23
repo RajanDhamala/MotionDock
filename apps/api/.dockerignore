@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Go build artifacts
+bin/
+build/
+dist/
+*.exe
+*.test
+*.out
+coverage.out
+*.coverprofile
+
+# Temporary files
+tmp/
+temp/
+*.log
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Local video files
+uploads/
+processed/
+exports/
+*.mp4
+*.mov
+*.mkv
+*.webm
+
+# Documentation
+README.md

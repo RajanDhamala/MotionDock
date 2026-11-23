@@ -28,3 +28,4 @@ exports/
 .idea/
 .vscode/
 .DS_Store
+internal
