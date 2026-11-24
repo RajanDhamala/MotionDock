@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { ArrowRight, Terminal, Zap, LayoutTemplate } from "lucide-react";
+import { Link } from "react-router";
 
 const Pill = ({ label }: { label: string }) => (
   <span className="rounded-full border border-border bg-card/80 px-3 py-1 text-[11px] font-mono text-muted-foreground 
@@ -53,14 +54,20 @@ const LandingPage = () => {
           </div>
         </div>
 
-        <nav className="hidden items-center gap-4 text-xs font-medium text-muted-foreground md:flex">
-          <button className="rounded-full border border-transparent px-4 py-1.5 transition hover:border-border hover:bg-muted/60">
+        <nav className="flex items-center gap-2 text-sm font-medium text-muted-foreground md:gap-4">
+          <Link to="/login" className="rounded-full px-3 py-1.5 transition hover:bg-muted/60">
+            Sign in
+          </Link>
+          <Link to="/register" className="rounded-full bg-foreground px-3 py-1.5 text-background transition hover:bg-foreground/90">
+            Create account
+          </Link>
+          <button className="hidden rounded-full border border-transparent px-4 py-1.5 transition hover:border-border hover:bg-muted/60 md:inline-flex">
             Docs (soon)
           </button>
 
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-full border bg-foreground px-4 py-1.5 font-semibold text-background shadow-sm shadow-black/10 transition hover:bg-foreground/90"
+            className="hidden items-center gap-1.5 rounded-full border bg-foreground px-4 py-1.5 font-semibold text-background shadow-sm shadow-black/10 transition hover:bg-foreground/90 md:inline-flex"
             onClick={() => {
               window.open("https://github.com/RajanDhamala/cli", "_blank", "noopener,noreferrer");
             }}

@@ -6,8 +6,10 @@ package db
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -55,16 +57,16 @@ func (ns NullUploadStatus) Value() (driver.Value, error) {
 }
 
 type Upload struct {
-	ID        pgtype.UUID        `json:"_id"`
+	ID        uuid.UUID          `json:"_id"`
 	Key       string             `json:"key"`
 	Status    NullUploadStatus   `json:"status"`
-	Owner     pgtype.UUID        `json:"owner"`
-	Metadata  []byte             `json:"metadata"`
+	Owner     uuid.UUID          `json:"owner"`
+	Metadata  json.RawMessage    `json:"metadata"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type User struct {
-	ID        pgtype.UUID `json:"_id"`
+	ID        uuid.UUID   `json:"_id"`
 	Fullname  string      `json:"fullname"`
 	Avatar    pgtype.Text `json:"avatar"`
 	Email     string      `json:"email"`

@@ -6,9 +6,10 @@ Use Go 1.25 or newer for the API, Node.js 24 and pnpm 10 for the web app, and Ma
 
 **API**
 
-Create `apps/api/.env` and set `S3_BUCKET` to a bucket you can use for development. Configure your AWS credentials and region locally for S3 requests. Keep `.env` files and credentials out of Git.
+Create `apps/api/.env` and set `DATABASE_URL` to your local PostgreSQL connection string. Set `S3_BUCKET` to a bucket you can use for development and configure your AWS credentials and region locally for S3 requests. Keep `.env` files and credentials out of Git.
 
 ```sh
+make up # Apply the database migrations with Goose.
 make api
 ```
 

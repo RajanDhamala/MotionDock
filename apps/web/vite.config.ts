@@ -19,7 +19,7 @@ export default defineConfig(({ command }) => {
           port: 5173,
           proxy: {
             "/api": {
-              target: "http://localhost:8000", // dev backend container
+              target: "http://127.0.0.1:8080",
               changeOrigin: true,
               rewrite: (path) => path.replace(/^\/api/, ""), // remove /api only in dev
             },
