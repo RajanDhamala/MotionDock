@@ -7,9 +7,22 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const checkIfusrExists = `-- name: CheckIfusrExists :one
+  SELECT _id from users WHERE email=$1
+`
+
+func (q *Queries) CheckIfusrExists(ctx context.Context, email string) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, checkIfusrExists, email)
+	var _id uuid.UUID
+	err := row.Scan(&_id)
+	return _id, err
+}
 
 const checkUpload = `-- name: CheckUpload :one
 SELECT key,metadata,created_at, _id,status from uploads WHERE owner=$1
@@ -17,13 +30,13 @@ SELECT key,metadata,created_at, _id,status from uploads WHERE owner=$1
 
 type CheckUploadRow struct {
 	Key       string             `json:"key"`
-	Metadata  []byte             `json:"metadata"`
+	Metadata  json.RawMessage    `json:"metadata"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	ID        pgtype.UUID        `json:"_id"`
+	ID        uuid.UUID          `json:"_id"`
 	Status    NullUploadStatus   `json:"status"`
 }
 
-func (q *Queries) CheckUpload(ctx context.Context, owner pgtype.UUID) (CheckUploadRow, error) {
+func (q *Queries) CheckUpload(ctx context.Context, owner uuid.UUID) (CheckUploadRow, error) {
 	row := q.db.QueryRow(ctx, checkUpload, owner)
 	var i CheckUploadRow
 	err := row.Scan(
@@ -36,15 +49,60 @@ func (q *Queries) CheckUpload(ctx context.Context, owner pgtype.UUID) (CheckUplo
 	return i, err
 }
 
+const deletePendingUploads = `-- name: DeletePendingUploads :exec
+DELETE from uploads WHERE status='pending'
+`
+
+func (q *Queries) DeletePendingUploads(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deletePendingUploads)
+	return err
+}
+
+const getUserUploads = `-- name: GetUserUploads :many
+SELECT _id,status,metadata,created_at from uploads WHERE owner=$1
+`
+
+type GetUserUploadsRow struct {
+	ID        uuid.UUID          `json:"_id"`
+	Status    NullUploadStatus   `json:"status"`
+	Metadata  json.RawMessage    `json:"metadata"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GetUserUploads(ctx context.Context, owner uuid.UUID) ([]GetUserUploadsRow, error) {
+	rows, err := q.db.Query(ctx, getUserUploads, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUserUploadsRow
+	for rows.Next() {
+		var i GetUserUploadsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Status,
+			&i.Metadata,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const loginUser = `-- name: LoginUser :one
 SELECT fullname ,email ,password,_id from users WHERE email=$1
 `
 
 type LoginUserRow struct {
-	Fullname string      `json:"fullname"`
-	Email    string      `json:"email"`
-	Password string      `json:"password"`
-	ID       pgtype.UUID `json:"_id"`
+	Fullname string    `json:"fullname"`
+	Email    string    `json:"email"`
+	Password string    `json:"password"`
+	ID       uuid.UUID `json:"_id"`
 }
 
 func (q *Queries) LoginUser(ctx context.Context, email string) (LoginUserRow, error) {
@@ -60,19 +118,36 @@ func (q *Queries) LoginUser(ctx context.Context, email string) (LoginUserRow, er
 }
 
 const registerUser = `-- name: RegisterUser :one
-INSERT INTO users (fullname,email,password) VALUES ($1,$2,&3) RETURNING _id
+INSERT INTO users (fullname,email,password) VALUES ($1,$2,$3) RETURNING _id
 `
 
 type RegisterUserParams struct {
 	Fullname string `json:"fullname"`
 	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
-func (q *Queries) RegisterUser(ctx context.Context, arg RegisterUserParams) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, registerUser, arg.Fullname, arg.Email)
-	var _id pgtype.UUID
+func (q *Queries) RegisterUser(ctx context.Context, arg RegisterUserParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, registerUser, arg.Fullname, arg.Email, arg.Password)
+	var _id uuid.UUID
 	err := row.Scan(&_id)
 	return _id, err
+}
+
+const retriveKey = `-- name: RetriveKey :one
+SELECT key from uploads WHERE owner=$1 AND _id=$2 AND status='uploaded'
+`
+
+type RetriveKeyParams struct {
+	Owner uuid.UUID `json:"owner"`
+	ID    uuid.UUID `json:"_id"`
+}
+
+func (q *Queries) RetriveKey(ctx context.Context, arg RetriveKeyParams) (string, error) {
+	row := q.db.QueryRow(ctx, retriveKey, arg.Owner, arg.ID)
+	var key string
+	err := row.Scan(&key)
+	return key, err
 }
 
 const updateUserAvatar = `-- name: UpdateUserAvatar :one
@@ -81,7 +156,7 @@ UPDATE users SET avatar=$1 WHERE _id=$2 RETURNING _id, fullname, avatar, email, 
 
 type UpdateUserAvatarParams struct {
 	Avatar pgtype.Text `json:"avatar"`
-	ID     pgtype.UUID `json:"_id"`
+	ID     uuid.UUID   `json:"_id"`
 }
 
 func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (User, error) {
@@ -99,18 +174,41 @@ func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarPara
 }
 
 const uploadVideo = `-- name: UploadVideo :one
-INSERT INTO uploads (key,owner,metadata) VALUES ($1,$2,$3) RETURNING _id
+INSERT INTO uploads (_id,key,owner,metadata) VALUES ($1,$2,$3,$4) RETURNING _id
 `
 
 type UploadVideoParams struct {
-	Key      string      `json:"key"`
-	Owner    pgtype.UUID `json:"owner"`
-	Metadata []byte      `json:"metadata"`
+	ID       uuid.UUID       `json:"_id"`
+	Key      string          `json:"key"`
+	Owner    uuid.UUID       `json:"owner"`
+	Metadata json.RawMessage `json:"metadata"`
 }
 
-func (q *Queries) UploadVideo(ctx context.Context, arg UploadVideoParams) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, uploadVideo, arg.Key, arg.Owner, arg.Metadata)
-	var _id pgtype.UUID
+func (q *Queries) UploadVideo(ctx context.Context, arg UploadVideoParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, uploadVideo,
+		arg.ID,
+		arg.Key,
+		arg.Owner,
+		arg.Metadata,
+	)
+	var _id uuid.UUID
 	err := row.Scan(&_id)
 	return _id, err
+}
+
+const videoUploadCompleted = `-- name: VideoUploadCompleted :execrows
+UPDATE uploads set status='uploaded' WHERE owner=$1 AND _id=$2
+`
+
+type VideoUploadCompletedParams struct {
+	Owner uuid.UUID `json:"owner"`
+	ID    uuid.UUID `json:"_id"`
+}
+
+func (q *Queries) VideoUploadCompleted(ctx context.Context, arg VideoUploadCompletedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, videoUploadCompleted, arg.Owner, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

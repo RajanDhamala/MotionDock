@@ -29,3 +29,4 @@ exports/
 .vscode/
 .DS_Store
 internal
+!/apps/api/cmd/internal/

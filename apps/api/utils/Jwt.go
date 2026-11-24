@@ -7,18 +7,25 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserJWT struct {
 	Username string
-	Id       string
+	ID       uuid.UUID
+}
+
+type userJWTClaims struct {
+	Username string     `json:"username"`
+	ID       *uuid.UUID `json:"id"`
+	jwt.RegisteredClaims
 }
 
 func CreateAccessToken(data *UserJWT) (string, error) {
 	claims := jwt.MapClaims{
 		"username": data.Username,
-		"id":       data.Id,
+		"id":       data.ID,
 		"exp":      time.Now().Add(15 * time.Minute).Unix(),
 		"iat":      time.Now().Unix(),
 	}
@@ -30,7 +37,7 @@ func CreateAccessToken(data *UserJWT) (string, error) {
 func CreateRefreshToken(data *UserJWT) (string, error) {
 	claims := jwt.MapClaims{
 		"username": data.Username,
-		"id":       data.Id,
+		"id":       data.ID,
 		"exp":      time.Now().Add(7 * 24 * time.Hour).Unix(),
 		"iat":      time.Now().Unix(),
 	}
@@ -40,52 +47,26 @@ func CreateRefreshToken(data *UserJWT) (string, error) {
 }
 
 func VerifyAccessToken(tokenString string) (*UserJWT, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method")
-		}
-		return accessTokenSecret(), nil
-	})
-	if err != nil || !token.Valid {
-		return nil, fmt.Errorf("invalid access token")
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, fmt.Errorf("invalid claims")
-	}
-	username, _ := claims["username"].(string)
-	id, _ := claims["id"].(string)
-
-	return &UserJWT{
-		Username: username,
-		Id:       id,
-	}, nil
+	return verifyUserToken(tokenString, accessTokenSecret(), "access")
 }
 
 func VerifyRefreshToken(tokenString string) (*UserJWT, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	return verifyUserToken(tokenString, refreshTokenSecret(), "refresh")
+}
+
+func verifyUserToken(tokenString string, secret []byte, tokenType string) (*UserJWT, error) {
+	claims := &userJWTClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
-		return refreshTokenSecret(), nil
+		return secret, nil
 	})
-	if err != nil || !token.Valid {
-		return nil, fmt.Errorf("invalid refresh token")
+	if err != nil || !token.Valid || claims.ID == nil {
+		return nil, fmt.Errorf("invalid %s token", tokenType)
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, fmt.Errorf("invalid claims")
-	}
-
-	username, _ := claims["username"].(string)
-	id, _ := claims["id"].(string)
-
-	return &UserJWT{
-		Username: username,
-		Id:       id,
-	}, nil
+	return &UserJWT{Username: claims.Username, ID: *claims.ID}, nil
 }
 
 func HashPassword(passwrod string) (string, error) {

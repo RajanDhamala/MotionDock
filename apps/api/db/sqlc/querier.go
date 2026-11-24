@@ -7,15 +7,20 @@ package db
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 type Querier interface {
-	CheckUpload(ctx context.Context, owner pgtype.UUID) (CheckUploadRow, error)
+	CheckIfusrExists(ctx context.Context, email string) (uuid.UUID, error)
+	CheckUpload(ctx context.Context, owner uuid.UUID) (CheckUploadRow, error)
+	DeletePendingUploads(ctx context.Context) error
+	GetUserUploads(ctx context.Context, owner uuid.UUID) ([]GetUserUploadsRow, error)
 	LoginUser(ctx context.Context, email string) (LoginUserRow, error)
-	RegisterUser(ctx context.Context, arg RegisterUserParams) (pgtype.UUID, error)
+	RegisterUser(ctx context.Context, arg RegisterUserParams) (uuid.UUID, error)
+	RetriveKey(ctx context.Context, arg RetriveKeyParams) (string, error)
 	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (User, error)
-	UploadVideo(ctx context.Context, arg UploadVideoParams) (pgtype.UUID, error)
+	UploadVideo(ctx context.Context, arg UploadVideoParams) (uuid.UUID, error)
+	VideoUploadCompleted(ctx context.Context, arg VideoUploadCompletedParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)
